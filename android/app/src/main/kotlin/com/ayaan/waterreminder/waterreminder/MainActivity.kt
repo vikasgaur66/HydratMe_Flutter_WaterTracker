@@ -1,4 +1,4 @@
-package com.ayaan.waterreminder.water_reminder
+package com.ayaan.waterreminder.waterreminder
 
 import io.flutter.embedding.android.FlutterActivity
 

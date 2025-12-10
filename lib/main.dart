@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:water_reminder/alarm_page.dart';
-import 'package:water_reminder/reports_page.dart';
-import 'package:water_reminder/takeuserdata.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'alarm_page.dart';
+import 'reports_page.dart';
+import 'takeuserdata.dart';
+import 'dart:io';
+import 'package:path_provider/path_provider.dart';
+import 'dart:convert';
 
 void main() {
   runApp(MyApp());
@@ -36,31 +38,51 @@ class _HomeScreenState extends State<HomeScreen> {
     loadData();
   }
 
+  // File path
+  Future<File> get _drinkFile async {
+    final dir = await getApplicationDocumentsDirectory();
+    return File('${dir.path}/drinkdata.json');
+  }
+
   String getTodayKey() {
     DateTime now = DateTime.now();
-    return "${now.year}-${now.month}-${now.day}"; // e.g., 2025-12-05
+    return "${now.year}-${now.month}-${now.day}";
   }
 
-  // 1️⃣ Load saved totalDrink
   loadData() async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    String todayKey = getTodayKey();
-    setState(() {
-      totalDrink = prefs.getDouble(todayKey) ?? 0.0;
-    });
+    try {
+      final file = await _drinkFile;
+      if (await file.exists()) {
+        String content = await file.readAsString();
+        Map<String, dynamic> data = json.decode(content);
+        setState(() {
+          totalDrink = data[getTodayKey()] ?? 0.0;
+        });
+      }
+    } catch (e) {
+      totalDrink = 0.0;
+    }
   }
 
-  // 2️⃣ Save totalDrink
   saveTotalDrink() async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    String todayKey = getTodayKey();
-    await prefs.setDouble(todayKey, totalDrink);
+    final file = await _drinkFile;
+    Map<String, dynamic> data = {};
+    if (await file.exists()) {
+      String content = await file.readAsString();
+      data = json.decode(content);
+    }
+    data[getTodayKey()] = totalDrink;
+    await file.writeAsString(json.encode(data));
   }
 
-  // 3️⃣ Reset water intake
   resetDrink() async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    await prefs.remove('totalDrink');
+    final file = await _drinkFile;
+    if (await file.exists()) {
+      String content = await file.readAsString();
+      Map<String, dynamic> data = json.decode(content);
+      data.remove(getTodayKey());
+      await file.writeAsString(json.encode(data));
+    }
     setState(() {
       totalDrink = 0.0;
     });
@@ -84,188 +106,130 @@ class _HomeScreenState extends State<HomeScreen> {
         child: Center(
           child: Column(
             children: [
-              //
               Expanded(
-                child: Container(
-                  child: Stack(
-                    children: [
-                      Container(
-                        child: Center(
-                          child: CircleAvatar(
-                            radius: 100,
-
-                            backgroundColor: const Color.fromARGB(
-                              255,
-                              255,
-                              255,
-                              255,
-                            ),
-                            backgroundImage: AssetImage(
-                              "assets/images/download1.gif",
-                            ),
-
-                            child: Text(
-                              "${totalDrink.toStringAsFixed(2)} /${widget.goal} Liter ",
-                              style: TextStyle(fontSize: 25),
-                            ),
-                          ),
+                child: Stack(
+                  children: [
+                    Center(
+                      child: CircleAvatar(
+                        radius: 100,
+                        backgroundColor: Colors.white,
+                        backgroundImage: AssetImage(
+                          "assets/images/download1.gif",
+                        ),
+                        child: Text(
+                          "${totalDrink.toStringAsFixed(2)} /${widget.goal} Liter",
+                          style: TextStyle(fontSize: 25),
                         ),
                       ),
-                      Container(
-                        child: TextButton(
-                          onPressed: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => AlarmPage(),
-                              ),
-                            );
-                          },
-                          child: Text(
-                            "⏰",
-                            style: TextStyle(fontSize: 35),
-                            textAlign: TextAlign.start,
-                          ),
-                        ),
+                    ),
+                    TextButton(
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (context) => AlarmPage()),
+                        );
+                      },
+                      child: Text("⏰", style: TextStyle(fontSize: 35)),
+                    ),
+                    Positioned(
+                      right: 0,
+                      child: TextButton(
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (context) => reports()),
+                          );
+                        },
+                        child: Text("🗓️", style: TextStyle(fontSize: 35)),
                       ),
-                      Positioned(
-                        right: 0,
-                        child: Container(
-                          child: TextButton(
-                            onPressed: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => reports(),
-                                ),
-                              );
-                            },
-                            child: Text("🗓️", style: TextStyle(fontSize: 35)),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               ),
-
-              //
               Expanded(
-                child: Column(
-                  children: [
-                    Container(
-                      height: 20,
-
-                      child: Text(
+                child: Padding(
+                  padding: const EdgeInsets.only(left: 50, right: 50),
+                  child: Column(
+                    children: [
+                      Text(
                         "Hey ${widget.name}, pick your water amount 👇",
-                        style: TextStyle(color: Colors.white, fontSize: 15),
+                        style: TextStyle(color: Colors.white, fontSize: 13),
                       ),
-                    ),
-                    SizedBox(height: 10),
-                    Expanded(
-                      child: Container(
-                        height: 25,
-                        width: 250,
-
-                        child: ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            shadowColor: Colors.black,
-                            elevation: 3,
-                          ),
-                          onPressed: () {
-                            setState(() {
-                              totalDrink += 0.1; // 100
-                              saveTotalDrink();
-                            });
-                          },
-
-                          child: Text(
-                            "🥛  100 ml",
-                            style: TextStyle(fontSize: 18),
+                      SizedBox(height: 10),
+                      Expanded(
+                        child: Container(
+                          width: double.infinity,
+                          child: ElevatedButton(
+                            onPressed: () {
+                              setState(() {
+                                totalDrink += 0.1;
+                                saveTotalDrink();
+                              });
+                            },
+                            child: Text(
+                              "🥛  100 ml",
+                              style: TextStyle(fontSize: 18),
+                            ),
                           ),
                         ),
                       ),
-                    ),
-
-                    // secondline......................................................................
-                    SizedBox(height: 10),
-                    Expanded(
-                      child: Container(
-                        height: 25,
-                        width: 250,
-
-                        child: ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            shadowColor: Colors.black,
-                            elevation: 3,
-                          ),
-                          onPressed: () {
-                            setState(() {
-                              totalDrink += 0.2; // 100 ml
-                              saveTotalDrink();
-                            });
-                          },
-
-                          child: Text(
-                            "🥛  200 ml",
-                            style: TextStyle(fontSize: 18),
+                      SizedBox(height: 10),
+                      Expanded(
+                        child: Container(
+                          width: double.infinity,
+                          child: ElevatedButton(
+                            onPressed: () {
+                              setState(() {
+                                totalDrink += 0.2;
+                                saveTotalDrink();
+                              });
+                            },
+                            child: Text(
+                              "🥛  200 ml",
+                              style: TextStyle(fontSize: 18),
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                    SizedBox(height: 10),
-                    Expanded(
-                      child: Container(
-                        height: 25,
-                        width: 250,
-
-                        child: ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            shadowColor: Colors.black,
-                            elevation: 3,
-                          ),
-
-                          onPressed: () {
-                            setState(() {
-                              totalDrink += 0.25; // 100 ml
-                              saveTotalDrink();
-                            });
-                          },
-
-                          child: Text(
-                            "🥛  250 ml",
-                            style: TextStyle(fontSize: 18),
+                      SizedBox(height: 10),
+                      Expanded(
+                        child: Container(
+                          width: double.infinity,
+                          child: ElevatedButton(
+                            onPressed: () {
+                              setState(() {
+                                totalDrink += 0.25;
+                                saveTotalDrink();
+                              });
+                            },
+                            child: Text(
+                              "🥛  250 ml",
+                              style: TextStyle(fontSize: 18),
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                    SizedBox(height: 10),
-                    Expanded(
-                      child: Container(
-                        height: 25,
-                        width: 250,
-
-                        child: ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            shadowColor: Colors.black,
-                            elevation: 5,
-                          ),
-                          onPressed: () {
-                            setState(() {
-                              totalDrink += 0.5; // 100 ml
-                              saveTotalDrink();
-                            });
-                          },
-
-                          child: Text(
-                            "🥛  500 ml",
-                            style: TextStyle(fontSize: 18),
+                      SizedBox(height: 10),
+                      Expanded(
+                        child: Container(
+                          width: double.infinity,
+                          child: ElevatedButton(
+                            onPressed: () {
+                              setState(() {
+                                totalDrink += 0.5;
+                                saveTotalDrink();
+                              });
+                            },
+                            child: Text(
+                              "🥛  500 ml",
+                              style: TextStyle(fontSize: 18),
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                    SizedBox(height: 20),
-                  ],
+                      SizedBox(height: 20),
+                    ],
+                  ),
                 ),
               ),
             ],
